@@ -3,3 +3,5 @@ venv/
 kaggle/
 diagrams/
 .idea/
+logs/
+__pycache__/
