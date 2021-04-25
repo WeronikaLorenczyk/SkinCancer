@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 
 
-
+#implementacja funkcji pochodzi ze strony https://www.kaggle.com/apacheco/shades-of-gray-color-constancy
 def shade_of_gray_cc(img, power=6, gamma=None):
     """
     img (numpy array): the original image with format of (h, w, c)
