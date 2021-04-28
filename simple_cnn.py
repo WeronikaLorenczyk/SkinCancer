@@ -1,6 +1,9 @@
-from sklearn.metrics import confusion_matrix
+from keras_preprocessing.image import ImageDataGenerator
+from sklearn.metrics import confusion_matrix, roc_curve, auc
 from tensorflow.keras import layers, models, losses, callbacks
 import numpy as np
+from tensorflow.python.keras.callbacks import ReduceLROnPlateau
+
 from plots import plot_confusion_matrix
 import matplotlib.pyplot as plt
 import pickle
@@ -11,8 +14,9 @@ from prepare_data import get_data
 from models import my_model, transfer_model
 
 
-class Metrics_two(keras.callbacks.Callback):
+class MetricsTwo(keras.callbacks.Callback):
 
+    #TODO tu rowne klasy dla auc
     def __init__(self, validation_data, class_weights):
         super().__init__()
         self.validation_data = validation_data
@@ -49,7 +53,7 @@ class Metrics_two(keras.callbacks.Callback):
         return
 
 
-class Metrics_all(keras.callbacks.Callback):
+class MetricsAll(keras.callbacks.Callback):
 
     def __init__(self, validation_data, class_weights):
         super().__init__()
@@ -83,9 +87,26 @@ def plot_conf_matrix(Y_pred,test_y, data_type, info_str ):
     else:
         classes = ('mel','nv')
     plot_confusion_matrix(confusion_mtx, classes=classes)
-    plt.savefig("diagrams/test3/" + info_str + ".png")
+    plt.savefig("diagrams/test3/conf/" + info_str + ".png")
     plt.clf()
 
+
+def plot_roc(test_y, Y_pred, info_str):
+    fpr, tpr, _ = roc_curve(test_y[:, 1], Y_pred[:, 1])
+    roc_auc = auc(fpr, tpr)
+
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange',
+             lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.0])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver operating characteristic example')
+    plt.legend(loc="lower right")
+    plt.savefig("diagrams/test3/roc/" + info_str + ".png")
+    plt.clf()
 
 def add_tb_info(metrics, epoch, data_type, logdir):
     summary_writer = tf.summary.create_file_writer(logdir+"/validation")
@@ -113,6 +134,25 @@ def run_train_test(data_string, pic_shape,if_transfer, epoch,batch_size,model_ty
 
     train_X, train_y, test_X, test_y, class_weights_test, class_weights_train = data[0]
 
+    if "aug=True" in data_string:
+        train_datagen = ImageDataGenerator(rotation_range=10,
+                                           width_shift_range=0.2,
+                                           height_shift_range=0.2,
+                                           shear_range=0.2,
+                                           horizontal_flip=True,
+                                           vertical_flip=True,
+                                           fill_mode='nearest')
+
+    else:
+        train_datagen = ImageDataGenerator(rescale=1)
+
+    train_datagen.fit(train_X)
+
+    test_datagen = ImageDataGenerator(rescale=1)
+    test_datagen.fit(test_X)
+    train_data = train_datagen.flow(train_X, train_y, batch_size=batch_size)
+    test_data = test_datagen.flow(test_X, test_y, batch_size=batch_size)
+
     print("class weights ",class_weights_train, class_weights_test)
 
     print(train_X.shape, test_X.shape, info_str)
@@ -124,20 +164,30 @@ def run_train_test(data_string, pic_shape,if_transfer, epoch,batch_size,model_ty
         model.add(layers.Dense(test_y.shape[1], activation="softmax"))
 
     if data[1] == "two":
-        metrics = Metrics_two((test_X, test_y), class_weights_test)
+        metrics = MetricsTwo((test_X, test_y), class_weights_test)
     else:
-        metrics = Metrics_all((test_X, test_y), class_weights_test)
+        metrics = MetricsAll((test_X, test_y), class_weights_test)
 
     model.compile(optimizer=optimizer,
                   loss=losses.CategoricalCrossentropy(from_logits=True),
                   metrics=["accuracy"])
+    
+    learning_rate_reduction = ReduceLROnPlateau(monitor='val_acc',
+                                                patience=3,
+                                                verbose=1,
+                                                factor=0.5,
+                                                min_lr=0.00001)
 
-    history = model.fit(train_X, train_y, epochs=epoch, batch_size=batch_size,
-                        validation_data=(test_X, test_y), class_weight=class_weights_train,  callbacks=[tensorboard_callback,metrics])
+    history = model.fit(train_data, epochs=epoch, batch_size=batch_size,
+                        validation_data=test_data, class_weight=class_weights_train,
+                        callbacks=[tensorboard_callback, metrics, learning_rate_reduction])
 
     Y_pred = model.predict(test_X)
     plot_conf_matrix(Y_pred,test_y, data[1], info_str)
     add_tb_info(metrics,epoch, data[1], logdir)
+    weights = [class_weights_test[0] if i[0]==1 else class_weights_test[1] for i in test_y]
+    plot_roc(test_y, Y_pred)
+
 
 
 def grid_search():
@@ -154,13 +204,13 @@ def grid_search():
 
 
 if __name__ == "__main__":
-    # with open("data/data32.pickle", "rb") as f:
-    #     all_data, two_cols_data = pickle.load(f)
+    with open("data/data32.pickle", "rb") as f:
+        all_data, two_cols_data = pickle.load(f)
     #
-    # run_train_test("xx", (32, 32), False, 15, 16, 1, "adam", (all_data, "all"))
+    run_train_test("xx", (32, 32), False, 2, 16, 1, "adam", (two_cols_data, "two"))
     #
     # architectures = ["vgg16","densenet121","inceptionv3","mobilenet","resnet101","xception"]
-    grid_search()
+    #grid_search()
 
 
 

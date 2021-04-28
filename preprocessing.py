@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 def augmentation_func(img):
     print("elo")
-    #img = rotate(img, angle=random.randint(-90,90))
+    img = rotate(img, angle=random.randint(-90,90))
     #tf = AffineTransform(shear=-0.5)
     #img = transform.warp(img, tf, order=1, preserve_range=True, mode='wrap')
     if random.randint(0,1):

@@ -66,7 +66,8 @@ def transfer_model(model_name, input_shape, classes_nr):
         layer.trainable = False
     flat1 = layers.Flatten()(model.layers[-1].output)
     class1 = layers.Dense(1024, activation='relu')(flat1)
-    class2 = layers.Dense(256, activation='relu')(class1)
+    drop1 = layers.Dropout(0.2)(class1)
+    class2 = layers.Dense(256, activation='relu')(drop1)
     output = layers.Dense(classes_nr, activation='softmax')(class2)
     model = Model(inputs=model.inputs, outputs=output)
     return model
