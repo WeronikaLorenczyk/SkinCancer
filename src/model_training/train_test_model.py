@@ -28,16 +28,18 @@ def add_tb_info(metrics, epoch, data_type, logdir):
                 tf.summary.scalar('weighted acc', metrics.w_acc[i], step=i)
 
 
-def run_train_test(gray, augmentation, pic_shape,if_transfer, epoch,batch_size,model_type,optimizer,data):
+def run_train_test(test_name,gray, augmentation, pic_shape,if_transfer, epoch,batch_size,model_type,optimizer,data):
     data_string = f"pic_shape{pic_shape}_aug={augmentation}_gray={gray}"
 
-    info_str = f"optimizer={optimizer}_data={data[1]}_epoch={epoch}_batch={batch_size}_model={model_type}_data_string={data_string}"
-    logdir = "logs/tests3"+info_str
+    info_str = f"{test_name}/optimizer={optimizer}_data={data[1]}_epoch={epoch}_batch={batch_size}_model={model_type}_data_string={data_string}"
+    logdir = "../../logs/"+info_str
     tensorboard_callback = callbacks.TensorBoard(log_dir=logdir)
 
     train_gen, test_gen, class_weights = data[0]
+
     train_gen = DataGenerator(train_gen.x_data, train_gen.y_data, train_gen.class_number)
     test_gen = DataGenerator(test_gen.x_data, test_gen.y_data, test_gen.class_number)
+
     train_gen.set_parameters(batch_size, augmentation)
     test_gen.set_parameters(batch_size, False)
     print("class weights ",class_weights)
@@ -82,7 +84,7 @@ if __name__ == "__main__":
     with open("../../data/data32.pickle", "rb") as f:
         all_data, two_cols_data = pickle.load(f)
     #
-    run_train_test(False, True, (32, 32), False, 15, 16, 1, "adam", (two_cols_data, "two"))
+    run_train_test("stupid_test",False, True, (32, 32), False, 30, 16, 1, "adam", (two_cols_data, "two"))
     #
     # architectures = ["vgg16","densenet121","inceptionv3","mobilenet","resnet101","xception"]
     #grid_search()
